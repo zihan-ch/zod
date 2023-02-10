@@ -3764,6 +3764,90 @@ export class ZodEnum<T extends [string, ...string[]]> extends ZodType<
 /////////////////////////////////////////////
 /////////////////////////////////////////////
 //////////                         //////////
+//////////      ZodSEnum           //////////
+//////////                         //////////
+/////////////////////////////////////////////
+/////////////////////////////////////////////
+export type SValues = Record<string, ZodType>;
+export type SItem<T extends SValues, K extends keyof T = keyof T> = [K, T[K]]
+
+export interface ZodSEnumDef<T extends SValues = SValues>
+  extends ZodTypeDef {
+  values: T;
+  typeName: ZodFirstPartyTypeKind.ZodSEnum;
+}
+
+export class ZodSEnum<T extends SValues> extends ZodType<
+  SItem<T>,
+  ZodSEnumDef<T>
+> {
+  _parse(input: ParseInput) {
+    if (!Array.isArray(input.data)) {
+      const ctx = this._getOrReturnCtx(input);
+      addIssueToContext(ctx, {
+        expected: 'array',
+        received: ctx.parsedType,
+        code: ZodIssueCode.invalid_type,
+      });
+      return INVALID;
+    }
+
+    const key = input.data[0]
+    const value = input.data[1]
+
+    if (key !== 'string') {
+      const ctx = this._getOrReturnCtx(input);
+      const expectedValues = Object.keys(this._def.values);
+      addIssueToContext(ctx, {
+        expected: util.joinValues(expectedValues) as 'string',
+        received: ctx.parsedType,
+        code: ZodIssueCode.invalid_type,
+      });
+      return INVALID;
+    }
+
+    if (Reflect.has(this._def.values, key)) {
+      const ctx = this._getOrReturnCtx(input);
+      const expectedValues = Object.keys(this._def.values);
+
+      addIssueToContext(ctx, {
+        received: ctx.data,
+        code: ZodIssueCode.invalid_enum_value,
+        options: expectedValues,
+      });
+      return INVALID;
+    }
+    
+    this._def.values[key].parse(value)
+    return OK(input.data as any);
+  }
+
+  // extract<ToExtract extends readonly [T[number], ...T[number][]]>(
+  //   values: ToExtract
+  // ): ZodEnum<Writeable<ToExtract>> {
+  //   return ZodEnum.create(values) as any;
+  // }
+
+  // exclude<ToExclude extends readonly [T[number], ...T[number][]]>(
+  //   values: ToExclude
+  // ): ZodEnum<
+  //   typecast<Writeable<FilterEnum<T, ToExclude[number]>>, [string, ...string[]]>
+  // > {
+  //   return ZodEnum.create(
+  //     this.options.filter((opt) => !values.includes(opt)) as FilterEnum<
+  //       T,
+  //       ToExclude[number]
+  //     >
+  //   ) as any;
+  // }
+
+  // static create = createZodEnum;
+}
+
+
+/////////////////////////////////////////////
+/////////////////////////////////////////////
+//////////                         //////////
 //////////      ZodNativeEnum      //////////
 //////////                         //////////
 /////////////////////////////////////////////
@@ -4504,6 +4588,7 @@ export enum ZodFirstPartyTypeKind {
   ZodLazy = "ZodLazy",
   ZodLiteral = "ZodLiteral",
   ZodEnum = "ZodEnum",
+  ZodSEnum = "ZodSEnum",
   ZodEffects = "ZodEffects",
   ZodNativeEnum = "ZodNativeEnum",
   ZodOptional = "ZodOptional",
@@ -4540,6 +4625,7 @@ export type ZodFirstPartySchemaTypes =
   | ZodLazy<any>
   | ZodLiteral<any>
   | ZodEnum<any>
+  | ZodSEnum<any>
   | ZodEffects<any, any, any>
   | ZodNativeEnum<any>
   | ZodOptional<any>
